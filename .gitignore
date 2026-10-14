@@ -1,0 +1,17 @@
+# Local AI / work organisation (never pushed)
+.claude/
+.work/
+
+# Dependencies & build
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log
