@@ -70,6 +70,8 @@ export async function fetchMeta(owner: string, repo: string): Promise<RepoMeta> 
 export interface TreeEntry {
   path: string;
   size: number;
+  /** Content hash (git blob sha, or jsDelivr hash): equal hash = unchanged file. */
+  sha?: string;
 }
 
 export interface Tree {
@@ -80,13 +82,13 @@ export interface Tree {
 }
 
 export async function fetchTree(owner: string, repo: string, ref: string): Promise<Tree> {
-  const json = await getJson<{ sha: string; truncated: boolean; tree: { path: string; type: string; size?: number }[] }>(
+  const json = await getJson<{ sha: string; truncated: boolean; tree: { path: string; type: string; size?: number; sha?: string }[] }>(
     `https://api.github.com/repos/${owner}/${repo}/git/trees/${encodeURIComponent(ref)}?recursive=1`,
   );
   return {
     sha: json.sha,
     truncated: json.truncated,
-    entries: json.tree.filter((e) => e.type === "blob").map((e) => ({ path: e.path, size: e.size ?? 0 })),
+    entries: json.tree.filter((e) => e.type === "blob").map((e) => ({ path: e.path, size: e.size ?? 0, sha: e.sha })),
     source: "github",
   };
 }
@@ -104,7 +106,7 @@ export async function fetchTreeFallback(owner: string, repo: string, ref?: strin
     if (!res.ok) continue;
     const json = (await res.json()) as { files?: { name: string; size: number; hash?: string }[] };
     if (!json.files) continue;
-    return { ref: r, tree: { sha: r, truncated: false, entries: json.files.map((f) => ({ path: f.name.replace(/^\//, ""), size: f.size })), source: "jsdelivr" } };
+    return { ref: r, tree: { sha: r, truncated: false, entries: json.files.map((f) => ({ path: f.name.replace(/^\//, ""), size: f.size, sha: f.hash })), source: "jsdelivr" } };
   }
   throw new FetchError("rate-limit", "GitHub API rate limit reached and the jsDelivr mirror has no copy of this repository.");
 }
@@ -135,4 +137,13 @@ export async function pool<T>(items: T[], limit: number, task: (item: T, index: 
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+}
+
+/** Tags (newest first, as GitHub lists them) and branches, for the compare picker. 2 API calls. */
+export async function fetchRefs(owner: string, repo: string): Promise<{ tags: string[]; branches: string[] }> {
+  const [tags, branches] = await Promise.all([
+    getJson<{ name: string }[]>(`https://api.github.com/repos/${owner}/${repo}/tags?per_page=30`),
+    getJson<{ name: string }[]>(`https://api.github.com/repos/${owner}/${repo}/branches?per_page=30`),
+  ]);
+  return { tags: tags.map((t) => t.name), branches: branches.map((b) => b.name) };
 }

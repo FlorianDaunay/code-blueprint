@@ -14,7 +14,7 @@ import type { ScenePalette } from "./palette";
 
 export type Pick = { kind: "file"; id: number } | { kind: "dir"; path: string } | null;
 
-export const TowerState = { Normal: 0, Dim: 1, Highlight: 2, Selected: 3 } as const;
+export const TowerState = { Normal: 0, Dim: 1, Highlight: 2, Selected: 3, Ghost: 4 } as const;
 export type TowerState = (typeof TowerState)[keyof typeof TowerState];
 
 export interface Bounds {

@@ -48,8 +48,8 @@ export class Controller {
           }),
       );
     }
-    if (newCity || s.lens !== prev.lens) this.recolor(s);
-    if (newCity || s.selection !== prev.selection || s.hover !== prev.hover || s.allArcs !== prev.allArcs || s.lens !== prev.lens) this.refocus(s);
+    if (newCity || s.lens !== prev.lens || s.diff !== prev.diff) this.recolor(s);
+    if (newCity || s.selection !== prev.selection || s.hover !== prev.hover || s.allArcs !== prev.allArcs || s.lens !== prev.lens || s.diff !== prev.diff) this.refocus(s);
     if (s.selection !== prev.selection && s.selection) this.flyToSelection(s);
     if (s.iso !== this.city.isometric) this.city.setIsometric(s.iso);
     if (s.glow !== this.city.bloomEnabled) this.city.setBloom(s.glow);
@@ -57,7 +57,7 @@ export class Controller {
 
   private recolor(s: AppState) {
     if (!s.analysis || !s.derived) return;
-    this.paint = paintLens(s.lens, s.analysis, s.derived, this.palette);
+    this.paint = paintLens(s.lens, s.analysis, s.derived, this.palette, s.diff);
     this.city.setTowerColors(this.paint.color, this.paint.pulse);
   }
 
@@ -83,12 +83,22 @@ export class Controller {
       if (s.hover !== null) {
         for (const t of d.outgoing[s.hover].slice(0, MAX_FOCUS_ARCS)) fileArc(s.hover, t, p.accent, 0.55);
         for (const f of d.incoming[s.hover].slice(0, MAX_FOCUS_ARCS)) fileArc(f, s.hover, p.incoming, 0.55);
+      } else if (s.lens === "diff" && s.diff) {
+        // What changed in the dependency graph: new links in green, vanished ones in red.
+        for (const [f, t] of s.diff.addedEdges.slice(0, MAX_FOCUS_ARCS)) fileArc(f, t, p.verdict.complete, 0.85);
+        for (const [f, t] of s.diff.removedEdges.slice(0, MAX_FOCUS_ARCS)) fileArc(f, t, p.verdict.flawed, 0.85);
       } else if (s.allArcs) arcs.push(...this.aggregated);
     } else if (sel.kind === "file") {
       primary = sel.id;
       highlight = new Set([sel.id, ...d.outgoing[sel.id], ...d.incoming[sel.id]]);
       for (const t of d.outgoing[sel.id].slice(0, MAX_FOCUS_ARCS)) fileArc(sel.id, t, p.accent, 0.9);
       for (const f of d.incoming[sel.id].slice(0, MAX_FOCUS_ARCS)) fileArc(f, sel.id, p.incoming, 0.9);
+      // Diff: links this file lost since the base ref (all of them for a removed file).
+      for (const [f, t] of s.diff?.removedEdges ?? []) {
+        if (f !== sel.id && t !== sel.id) continue;
+        highlight.add(f === sel.id ? t : f);
+        fileArc(f, t, p.verdict.flawed, 0.9);
+      }
     } else if (sel.kind === "dir") {
       dirFocus = sel.path;
       const inside = new Set(d.filesUnder.get(sel.path) ?? []);
@@ -121,7 +131,9 @@ export class Controller {
       }
     }
 
-    this.city.setTowerStates((f) => (f === primary ? TowerState.Selected : highlight ? (highlight.has(f) ? TowerState.Highlight : TowerState.Dim) : TowerState.Normal));
+    // Removed files (diff) are ghosts unless they are part of the focus.
+    const removed = (f: number) => s.diff?.status[f] === "removed";
+    this.city.setTowerStates((f) => (f === primary ? TowerState.Selected : highlight ? (highlight.has(f) ? (removed(f) ? TowerState.Ghost : TowerState.Highlight) : TowerState.Dim) : removed(f) ? TowerState.Ghost : TowerState.Normal));
     this.city.setPlatformStates((dir) => (dirFocus !== null && (dir === dirFocus) ? TowerState.Highlight : TowerState.Normal));
     this.city.setArcs(arcs);
 

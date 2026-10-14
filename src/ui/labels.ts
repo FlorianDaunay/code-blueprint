@@ -49,7 +49,7 @@ export class Labels {
       const p = px >= l.minPx && shownDirs < 80 ? this.city.project(l.pos) : null;
       const w = Math.max(60, Math.min(260, px * 0.9));
       const textW = Math.min(w, (l.el.textContent?.length ?? 8) * 7.5 + 8);
-      if (!p || p.x > this.city.visibleRight - 40 || placed.some((o) => p.y > o.y - 16 && p.y < o.y + 16 && p.x < o.x + o.w && p.x + textW > o.x)) {
+      if (!p || p.x < 92 || p.x > this.city.visibleRight - 40 || placed.some((o) => p.y > o.y - 16 && p.y < o.y + 16 && p.x < o.x + o.w && p.x + textW > o.x)) {
         if (l.el.style.display !== "none") l.el.style.display = "none";
         continue;
       }

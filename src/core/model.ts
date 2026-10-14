@@ -116,6 +116,8 @@ export interface FileNode {
   lang: Lang;
   /** Bytes, from the tree listing. */
   size: number;
+  /** Content hash from the tree listing (detects modified files when comparing refs). */
+  blob?: string;
   /** Code lines when analyzed, estimated from size otherwise. */
   loc: number;
   analyzed: boolean;
@@ -242,7 +244,7 @@ export interface Analysis {
 }
 
 /** Bump when the shape or semantics of `Analysis` change: invalidates caches. */
-export const ANALYSIS_VERSION = 2;
+export const ANALYSIS_VERSION = 3;
 
 export type Progress =
   | { phase: "meta" | "tree" | "analyze" | "cache"; message?: string }

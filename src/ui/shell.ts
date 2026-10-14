@@ -118,6 +118,7 @@ export interface HudActions {
   toggleIso(): void;
   resetView(): void;
   search(): void;
+  compare(): void;
 }
 
 export class Hud {
@@ -132,7 +133,8 @@ export class Hud {
 
   constructor(private act: HudActions) {
     for (const l of LENSES) {
-      const b = iconButton(l.icon, `${l.label}  [${l.key}]`, () => act.lens(l.id), "lens");
+      const b = iconButton(l.icon, `${l.label}  [${l.key}]`, () => act.lens(l.id), l.diffOnly ? "lens diff-only" : "lens");
+      b.hidden = !!l.diffOnly;
       this.lensButtons.set(l.id, b);
       this.lensBar.append(b);
     }
@@ -151,14 +153,17 @@ export class Hud {
     this.issuesBadge.className = `badge ${a.issues.some((i) => i.severity === "error") ? "err" : a.issues.length ? "warn" : "ok"}`;
     this.patternsBadge.textContent = String(a.patterns.length);
     const issuesBtn = h("button.hud-btn", { type: "button", "data-tip": "Health findings", "aria-label": "Health findings", onclick: () => this.act.panel(s.panel === "issues" ? "none" : "issues") }, icon("health", 18), this.issuesBadge);
+    const compareBtn = h("button.hud-btn", { type: "button", "data-tip": s.diff ? "Changes  [C]" : "Compare with another version  [C]", "aria-label": "Compare", onclick: () => this.act.compare() }, icon("diff", 18), s.diff ? h("span.badge.diffb", `${s.diff.stats.added + s.diff.stats.modified + s.diff.stats.removed}`) : null);
+    compareBtn.classList.toggle("active", s.panel === "compare" || s.panel === "changes");
     const patternsBtn = h("button.hud-btn", { type: "button", "data-tip": "Design patterns", "aria-label": "Design patterns", onclick: () => this.act.panel(s.panel === "patterns" ? "none" : "patterns") }, icon("patterns", 18), this.patternsBadge);
     issuesBtn.classList.toggle("active", s.panel === "issues");
     patternsBtn.classList.toggle("active", s.panel === "patterns");
     this.top.append(
       h("button.brand-mini", { type: "button", onclick: () => this.act.home(), "aria-label": "Home", "data-tip": "Home" }, icon("logo", 22)),
-      h("a.repo-chip", { href: `https://github.com/${a.repo.owner}/${a.repo.repo}`, target: "_blank", rel: "noopener" }, h("span", a.repo.owner + " / "), h("b", a.repo.repo), a.repo.path ? h("span", " / " + a.repo.path) : null, h("small", a.repo.ref)),
+      h("a.repo-chip", { href: `https://github.com/${a.repo.owner}/${a.repo.repo}`, target: "_blank", rel: "noopener" }, h("span", a.repo.owner + " / "), h("b", a.repo.repo), a.repo.path ? h("span", " / " + a.repo.path) : null, s.diff ? h("small.cmp-ref", `${s.diff.baseRef} → ${a.repo.ref}`) : h("small", a.repo.ref)),
       h("div.stats", stat("file", fmt(a.stats.files), `${a.stats.files} files (${a.stats.analyzedFiles} analyzed)`), stat("lines", fmt(a.stats.loc), "lines of code"), stat("arcs", fmt(a.stats.edges), "dependencies")),
       h("div.spacer"),
+      compareBtn,
       issuesBtn,
       patternsBtn,
       iconButton("search", "Search  [/]", () => this.act.search()),
@@ -176,7 +181,10 @@ export class Hud {
       iconButton("settings", "Settings", () => this.act.panel(s.panel === "settings" ? "none" : "settings")),
       iconButton("help", "How to read the map  [?]", () => this.act.panel(s.panel === "help" ? "none" : "help")),
     );
-    for (const [l, b] of this.lensButtons) b.classList.toggle("active", l === s.lens);
+    for (const [l, b] of this.lensButtons) {
+      b.classList.toggle("active", l === s.lens);
+      if (b.classList.contains("diff-only")) b.hidden = !s.diff;
+    }
     this.arcsBtn.classList.toggle("active", s.allArcs);
     this.isoBtn.classList.toggle("active", s.iso);
   }
@@ -337,8 +345,9 @@ export function helpPanel(): HTMLElement {
     row("health", "Health lens", "Fixed rules: cycles, layer violations, oversized files, hubs… Red pulses are errors."),
     row("patterns", "Patterns lens", "Detected design patterns, green complete, amber partial, red flawed. Open one to see what is missing or shouldn't be there."),
     row("coupling", "Coupling lens", "Heat of connections: hubs glow red."),
+    row("diff", "Compare versions", "Pick a tag, branch or commit: green towers were added, amber modified, red ghosts removed; green and red arcs are new and vanished dependencies."),
     h("h3.sub", icon("keyboard", 15), "Keys"),
-    h("div.keys", key("1-4", "lenses"), key("/", "search"), key("A", "all dependencies"), key("I", "isometric"), key("R", "reset view"), key("Esc", "back / close")),
+    h("div.keys", key("1-4", "lenses"), key("/", "search"), key("A", "all dependencies"), key("C", "compare / changes"), key("I", "isometric"), key("R", "reset view"), key("Esc", "back / close")),
   );
 }
 

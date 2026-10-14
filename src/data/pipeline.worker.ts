@@ -100,7 +100,7 @@ async function run(req: WorkerRequest) {
   progress({ phase: "analyze" });
   const analysis = analyze({
     repo: { owner, repo, ref: ref!, sha: tree.sha, path },
-    entries: code.map((e) => ({ path: e.path.slice(prefix.length), size: e.size })),
+    entries: code.map((e) => ({ path: e.path.slice(prefix.length), size: e.size, sha: e.sha })),
     contents,
     configs: configTexts,
     skipped,

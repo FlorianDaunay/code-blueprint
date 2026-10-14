@@ -4,6 +4,7 @@ import { LANG_LABEL } from "../core/languages";
 import type { ScenePalette } from "../scene/palette";
 import type { Derived } from "./derived";
 import type { Lens } from "./store";
+import type { DiffResult } from "../core/diff";
 import type { IconName } from "../ui/icons";
 
 export interface LensInfo {
@@ -11,6 +12,8 @@ export interface LensInfo {
   label: string;
   icon: IconName;
   key: string;
+  /** Only offered while comparing two refs. */
+  diffOnly?: boolean;
 }
 
 export const LENSES: LensInfo[] = [
@@ -18,6 +21,7 @@ export const LENSES: LensInfo[] = [
   { id: "health", label: "Health · rule violations", icon: "health", key: "2" },
   { id: "patterns", label: "Design patterns", icon: "patterns", key: "3" },
   { id: "coupling", label: "Coupling heat", icon: "coupling", key: "4" },
+  { id: "diff", label: "Changes between the two refs", icon: "diff", key: "5", diffOnly: true },
 ];
 
 export interface LegendEntry {
@@ -33,7 +37,7 @@ export interface LensPaint {
 
 const hex = (c: Color) => `#${c.getHexString()}`;
 
-export function paintLens(lens: Lens, a: Analysis, d: Derived, p: ScenePalette): LensPaint {
+export function paintLens(lens: Lens, a: Analysis, d: Derived, p: ScenePalette, diff: DiffResult | null = null): LensPaint {
   const ghost = p.neutral.clone().lerp(p.background, 0.55);
   switch (lens) {
     case "structure": {
@@ -77,6 +81,20 @@ export function paintLens(lens: Lens, a: Analysis, d: Derived, p: ScenePalette):
           { color: hex(p.verdict.flawed), label: "flawed" },
         ],
       };
+    case "diff": {
+      if (!diff) return paintLens("structure", a, d, p);
+      const colors = { added: p.verdict.complete, removed: p.verdict.flawed, modified: p.verdict.partial, unchanged: ghost };
+      return {
+        color: (f) => colors[diff.status[f] ?? "unchanged"],
+        pulse: (f) => (diff.status[f] === "added" ? 0.35 : 0),
+        legend: [
+          { color: hex(colors.added), label: "added" },
+          { color: hex(colors.modified), label: "modified" },
+          { color: hex(colors.removed), label: "removed" },
+          { color: hex(ghost), label: "unchanged" },
+        ],
+      };
+    }
     case "coupling": {
       const max = Math.log(d.maxDegree + 1);
       return {

@@ -10,7 +10,7 @@ import { buildTypeModel, type TypeModel } from "./types";
 export interface AnalysisInput {
   repo: RepoRef;
   /** Every code file of the tree (already filtered), with byte sizes. */
-  entries: { path: string; size: number }[];
+  entries: { path: string; size: number; sha?: string }[];
   /** Contents of the files that were fetched. */
   contents: Map<string, string>;
   configs: { path: string; text: string }[];
@@ -31,12 +31,12 @@ export interface AnalysisContext {
 
 export function analyze(input: AnalysisInput): Analysis {
   const files: FileNode[] = [];
-  for (const { path, size } of input.entries) {
+  for (const { path, size, sha } of input.entries) {
     const lang = langOf(path);
     if (!lang) continue;
     const slash = path.lastIndexOf("/");
     const file: FileNode = {
-      id: files.length, path, name: path.slice(slash + 1), dir: slash < 0 ? "" : path.slice(0, slash), ext: extOf(path), lang, size,
+      id: files.length, path, name: path.slice(slash + 1), dir: slash < 0 ? "" : path.slice(0, slash), ext: extOf(path), lang, size, blob: sha,
       loc: estimateLoc(size), analyzed: false, isTest: isTestPath(path), unresolved: [], externals: [],
     };
     const text = input.contents.get(path);

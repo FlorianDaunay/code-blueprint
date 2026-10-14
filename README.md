@@ -40,3 +40,10 @@ Keys: `1-4` lenses · `/` search · `A` all dependencies · `I` isometric · `R`
 GitHub Pages via `.github/workflows/deploy.yml` (Settings → Pages → Source: **GitHub Actions**).
 
 Stack: vanilla TypeScript, Vite, three.js, vitest. No UI framework.
+
+## Compare versions (diff city)
+
+Press `C` (or the compare button) and pick a tag, branch or commit: the map becomes the union of both versions.
+Green towers were added, amber modified, red wireframe ghosts were removed; green/red arcs are new/vanished dependencies.
+The *Changes* panel lists new and fixed findings, pattern regressions and improvements, and the most changed files.
+Deep link: `#/owner/repo?cmp=<base-ref>`.

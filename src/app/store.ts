@@ -1,8 +1,9 @@
 import type { Analysis } from "../core/model";
 import type { CityLayout } from "../core/layout";
 import type { Derived } from "./derived";
+import type { DiffResult } from "../core/diff";
 
-export type Lens = "structure" | "health" | "patterns" | "coupling";
+export type Lens = "structure" | "health" | "patterns" | "coupling" | "diff";
 
 export type Selection =
   | { kind: "file"; id: number }
@@ -11,7 +12,7 @@ export type Selection =
   | { kind: "pattern"; id: string }
   | null;
 
-export type Panel = "none" | "inspector" | "issues" | "patterns" | "settings" | "help";
+export type Panel = "none" | "inspector" | "issues" | "patterns" | "settings" | "help" | "compare" | "changes";
 
 export interface AppState {
   analysis: Analysis | null;
@@ -24,6 +25,8 @@ export interface AppState {
   /** Show aggregated dependency arcs when nothing is selected. */
   allArcs: boolean;
   iso: boolean;
+  /** Active comparison with another ref (the analysis is then the combined base+head city). */
+  diff: DiffResult | null;
   glow: boolean;
 }
 
@@ -51,7 +54,9 @@ const PREFS = "code-blueprint-prefs";
 export function loadPrefs(): Pick<AppState, "lens" | "allArcs" | "iso" | "glow"> {
   const defaults = { lens: "structure" as Lens, allArcs: false, iso: false, glow: true };
   try {
-    return { ...defaults, ...(JSON.parse(localStorage.getItem(PREFS) ?? "{}") as object) };
+    const saved = { ...defaults, ...(JSON.parse(localStorage.getItem(PREFS) ?? "{}") as object) };
+    // The diff lens only exists while comparing.
+    return saved.lens === "diff" ? { ...saved, lens: "structure" } : saved;
   } catch {
     return defaults;
   }

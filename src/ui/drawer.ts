@@ -3,6 +3,7 @@ import { LANG_LABEL } from "../core/languages";
 import { PATTERNS, patternInfo } from "../core/patterns/catalog";
 import { LIMITS, RULES } from "../core/rules";
 import type { Derived } from "../app/derived";
+import type { DiffResult } from "../core/diff";
 import type { Panel, Selection } from "../app/store";
 import { langHex } from "../scene/palette";
 import { clear, fmt, h, icon, iconButton } from "./dom";
@@ -15,24 +16,24 @@ export interface DrawerActions {
 
 const SEV_ICON: Record<Severity, IconName> = { error: "error", warning: "warning", info: "info" };
 
-export function githubUrl(a: Analysis, path: string, line?: number): string {
+export function githubUrl(a: Analysis, path: string, line?: number, sha = a.repo.sha): string {
   const full = a.repo.path ? `${a.repo.path}/${path}` : path;
-  return `https://github.com/${a.repo.owner}/${a.repo.repo}/blob/${a.repo.sha}/${full.split("/").map(encodeURIComponent).join("/")}${line ? `#L${line}` : ""}`;
+  return `https://github.com/${a.repo.owner}/${a.repo.repo}/blob/${sha}/${full.split("/").map(encodeURIComponent).join("/")}${line ? `#L${line}` : ""}`;
 }
 
 const verdictPill = (v: PatternMatch["verdict"]) => h(`span.pill.verdict-${v}`, v);
-const glyph = (pattern: string, size: "sm" | "lg" = "sm") => h(`span.glyph.glyph-${size}`, { "data-family": patternInfo(pattern)?.family ?? "" }, patternInfo(pattern)?.glyph ?? "?");
+export const glyph = (pattern: string, size: "sm" | "lg" = "sm") => h(`span.glyph.glyph-${size}`, { "data-family": patternInfo(pattern)?.family ?? "" }, patternInfo(pattern)?.glyph ?? "?");
 
-function tile(iconName: IconName, value: string | number, label: string, tone = ""): HTMLElement {
+export function tile(iconName: IconName, value: string | number, label: string, tone = ""): HTMLElement {
   return h(`div.tile${tone ? "." + tone : ""}`, { "data-tip": label }, icon(iconName, 16), h("b", String(value)), h("span", label));
 }
 
-function fileRow(a: Analysis, id: number, act: DrawerActions, extra?: Node): HTMLElement {
+export function fileRow(a: Analysis, id: number, act: DrawerActions, extra?: Node): HTMLElement {
   const f = a.files[id];
   return h("button.row", { type: "button", onclick: () => act.select({ kind: "file", id }) }, h("span.dot", { style: { background: langHex(f.lang) } }), h("span.row-main", f.name, h("small", f.dir || "/")), extra ?? null);
 }
 
-function section(title: string, count: number | string, body: () => Node[], open = false): HTMLElement {
+export function section(title: string, count: number | string, body: () => Node[], open = false): HTMLElement {
   const d = h("details.section", open ? { open: true } : {}, h("summary", h("span.sum-title", title), h("span.count", String(count)), icon("chevron", 14, "chev")));
   let filled = false;
   const fill = () => {
@@ -45,12 +46,12 @@ function section(title: string, count: number | string, body: () => Node[], open
   return d;
 }
 
-function header(iconEl: Node, title: string, sub: string, actions: Node[] = []): HTMLElement {
+export function header(iconEl: Node, title: string, sub: string, actions: Node[] = []): HTMLElement {
   return h("header.panel-head", h("div.panel-icon", iconEl), h("div.panel-title", h("h2", title), sub ? h("p", sub) : null), h("div.panel-actions", ...actions));
 }
 
 // ---------------------------------------------------------------- File
-export function fileInspector(a: Analysis, d: Derived, id: number, act: DrawerActions): HTMLElement {
+export function fileInspector(a: Analysis, d: Derived, id: number, act: DrawerActions, diff: DiffResult | null = null): HTMLElement {
   const f = a.files[id];
   const issues = d.issuesByFile.get(id) ?? [];
   const patterns = d.patternsByFile.get(id) ?? [];
@@ -59,10 +60,15 @@ export function fileInspector(a: Analysis, d: Derived, id: number, act: DrawerAc
   const root = h("div.panel");
   root.append(
     header(h("span.lang-chip", { style: { background: langHex(f.lang) } }, LANG_LABEL[f.lang].slice(0, 2)), f.name, f.dir || "/", [
-      h("a.icon-btn", { href: githubUrl(a, f.path), target: "_blank", rel: "noopener", "aria-label": "Open on GitHub", "data-tip": "Open on GitHub" }, icon("github")),
+      h("a.icon-btn", { href: githubUrl(a, f.path, undefined, diff?.status[id] === "removed" ? diff.baseSha : a.repo.sha), target: "_blank", rel: "noopener", "aria-label": "Open on GitHub", "data-tip": "Open on GitHub" }, icon("github")),
     ]),
     h("div.tiles", tile("lines", fmt(f.loc), f.analyzed ? "lines" : "≈ lines"), tile("out", d.outgoing[id].length, "uses"), tile("in", d.incoming[id].length, "used by"), tile("cube", types.length + fns.length, "symbols")),
   );
+  if (diff) {
+    const status = diff.status[id];
+    const delta = (status === "removed" ? 0 : f.loc) - diff.baseLoc[id];
+    root.append(h(`div.diff-strip.st-${status}`, icon(status === "added" ? "plus" : status === "removed" ? "minus" : status === "modified" ? "diff" : "check", 15), h("b", status), status === "unchanged" ? null : h("span", `${delta >= 0 ? "+" : "−"}${Math.abs(delta)} lines since ${diff.baseRef}`)));
+  }
   if (!f.analyzed) root.append(h("p.note", icon("info", 14), f.lang === "other" ? "Language not parsed: placed by size." : "Not analyzed (size or file cap)."));
   if (issues.length) {
     root.append(h("div.chips", ...issues.map((i) => h(`button.chip.sev-${i.severity}`, { type: "button", onclick: () => act.select({ kind: "issue", id: i.id }) }, icon(SEV_ICON[i.severity], 14), i.title))));
@@ -134,7 +140,7 @@ export function dirInspector(a: Analysis, d: Derived, path: string, act: DrawerA
 }
 
 // ---------------------------------------------------------------- Issues
-function issueRow(a: Analysis, i: Issue, act: DrawerActions): HTMLElement {
+export function issueRow(a: Analysis, i: Issue, act: DrawerActions): HTMLElement {
   const where = i.files.length === 1 ? a.files[i.files[0]].name : i.dirs.length ? i.dirs[0] || "/" : `${i.files.length} files`;
   return h("button.row", { type: "button", onclick: () => act.select({ kind: "issue", id: i.id }) }, h(`span.sev-icon.sev-${i.severity}`, icon(SEV_ICON[i.severity], 15)), h("span.row-main", i.title, h("small", where)));
 }

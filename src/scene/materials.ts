@@ -90,9 +90,13 @@ export function blockMaterial(opts: { edge: number; fill: number; glow: number }
           col = mix(uDim, uDim + vColor * 0.08, edge);
         } else if (vState > 1.5 && vState < 2.5) {
           col = col * 1.25 + vColor * edge * 0.6;
-        } else if (vState > 2.5) {
+        } else if (vState > 2.5 && vState < 3.5) {
           float beat = 0.6 + 0.4 * sin(uTime * 3.0);
           col = col * 1.4 + vec3(1.0) * edge * beat;
+        } else if (vState > 3.5) {
+          // Ghost: a wireframe of something that no longer exists (removed file in a diff).
+          float scan = 0.75 + 0.25 * sin(vLocal.y * 40.0 - uTime * 2.0);
+          col = mix(uDim * 0.7, vColor * 1.3 * scan, edge);
         }
         float fog = smoothstep(uFogNear, uFogFar, vDepth);
         gl_FragColor = vec4(mix(col, uFogColor, fog), 1.0);
