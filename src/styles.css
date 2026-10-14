@@ -1816,8 +1816,17 @@ kbd {
     border-radius: var(--radius-tile);
   }
 
-  .drawer-open .legend {
+  .drawer-open .legend,
+  .drawer-open .lens-bar {
     display: none;
+  }
+
+  .drawer-open .labels {
+    visibility: hidden;
+  }
+
+  .drawer {
+    background: rgb(var(--color-canvas) / 0.94);
   }
 }
 

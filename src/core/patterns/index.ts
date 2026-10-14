@@ -73,7 +73,8 @@ function singleton(ctx: PatternContext): PatternMatch[] {
 }
 
 // ---------------------------------------------------------------- Factories
-const CREATE_NAME = /^(create|make|build|new|get|from|of|for|produce|construct|instantiate)[A-Z_]?|^(create|make|build|produce|factory)$/i;
+// Case-sensitive on purpose: `GET()` (HTTP verb) or `getName()` are not creation methods.
+const CREATE_NAME = /^(create|make|build|new|produce|construct|instantiate|Create|Make|Build|New|Produce|Construct)([A-Z_]|$)|^(factory|Factory)$/;
 
 function factories(ctx: PatternContext): PatternMatch[] {
   const out: PatternMatch[] = [];

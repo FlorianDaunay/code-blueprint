@@ -84,6 +84,8 @@ export interface ImportInfo {
   /** Python relative import level (number of leading dots). */
   level?: number;
   kind: "module" | "type" | "namespace" | "package" | "include";
+  /** Imported inside a function body (deferred until called): the classic way to break a runtime cycle. */
+  lazy?: boolean;
   line: number;
 }
 
@@ -134,6 +136,8 @@ export interface Edge {
   kind: EdgeKind;
   /** Number of imports / references folded into this edge. */
   weight: number;
+  /** Every import behind this edge is deferred (function-local): ignored by the cycle rule. */
+  lazy?: boolean;
 }
 
 export interface DirNode {
@@ -238,7 +242,7 @@ export interface Analysis {
 }
 
 /** Bump when the shape or semantics of `Analysis` change: invalidates caches. */
-export const ANALYSIS_VERSION = 1;
+export const ANALYSIS_VERSION = 2;
 
 export type Progress =
   | { phase: "meta" | "tree" | "analyze" | "cache"; message?: string }

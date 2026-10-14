@@ -397,3 +397,17 @@ func (s *Store) Get(key string) (Item, error) {
     expect(info.selectors).toContain("db.Open");
   });
 });
+
+describe("python TYPE_CHECKING", () => {
+  it("ignores imports only used for type hints", () => {
+    const info = extract("from typing import TYPE_CHECKING\nimport os\nif TYPE_CHECKING:\n    from .app import Flask\n    import typing as t\nfrom .ctx import AppContext\n", "pkg/x.py", "python");
+    expect(info.imports.map((i) => i.spec)).toEqual(["typing", "os", "ctx"]);
+  });
+});
+
+describe("python docstrings", () => {
+  it("ignores import lines inside docstrings", () => {
+    const info = extract('"""Usage:\n\nfrom flask import Flask\nimport name of your app\n"""\nfrom .ctx import AppContext\n', "pkg/app.py", "python");
+    expect(info.imports.map((i) => i.spec)).toEqual(["ctx"]);
+  });
+});

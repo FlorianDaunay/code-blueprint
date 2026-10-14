@@ -162,6 +162,17 @@ export class Hud {
       issuesBtn,
       patternsBtn,
       iconButton("search", "Search  [/]", () => this.act.search()),
+      iconButton("share", "Copy link to this view", (e) => {
+        const btn = e.currentTarget as HTMLElement;
+        navigator.clipboard?.writeText(location.href).then(() => {
+          btn.classList.add("active");
+          btn.setAttribute("data-tip", "Link copied");
+          setTimeout(() => {
+            btn.classList.remove("active");
+            btn.setAttribute("data-tip", "Copy link to this view");
+          }, 1600);
+        }, () => undefined);
+      }),
       iconButton("settings", "Settings", () => this.act.panel(s.panel === "settings" ? "none" : "settings")),
       iconButton("help", "How to read the map  [?]", () => this.act.panel(s.panel === "help" ? "none" : "help")),
     );

@@ -1,5 +1,5 @@
 import {
-  ACESFilmicToneMapping, BoxGeometry, Color, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, MathUtils, Matrix4, Mesh,
+  ACESFilmicToneMapping, NoToneMapping, BoxGeometry, Color, DynamicDrawUsage, InstancedBufferAttribute, InstancedMesh, MathUtils, Matrix4, Mesh,
   OrthographicCamera, PerspectiveCamera, PlaneGeometry, Raycaster, Scene, Vector2, Vector3, WebGLRenderer, type ShaderMaterial,
 } from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
@@ -126,6 +126,8 @@ export class CityView {
     this.gridMat.uniforms.uMajor.value.copy(p.gridMajor);
     for (const m of [this.towerMat, this.platformMat, this.gridMat]) m.uniforms.uFogColor.value.copy(p.fog);
     for (const m of [this.towerMat, this.platformMat]) m.uniforms.uDim.value.copy(p.dim);
+    this.renderer.toneMapping = p.dark ? ACESFilmicToneMapping : NoToneMapping;
+    for (const m of [this.towerMat, this.platformMat]) m.uniforms.uLight.value = p.dark ? 0 : 1;
     this.bloom.strength = p.dark ? 0.55 : 0.2;
     this.bloom.threshold = p.dark ? 0.7 : 0.88;
     if (this.layout) this.colorPlatforms();
@@ -259,8 +261,14 @@ export class CityView {
     const dir = this.camera.position.clone().sub(this.controls.target);
     if (dir.lengthSq() < 1e-6) dir.copy(VIEW_DIR);
     dir.normalize();
-    const fov = MathUtils.degToRad(this.perspective.fov);
-    const dist = (radius * 1.15) / Math.sin(fov / 2);
+    // Fit the projected footprint: horizontally its full half-diagonal, vertically the half-diagonal
+    // foreshortened by the elevation plus the towers' height, against the visible (un-inset) aspect.
+    const vfov = MathUtils.degToRad(this.perspective.fov) / 2;
+    const aspect = Math.max(0.3, (this.container.clientWidth - this.inset.target) / Math.max(1, this.container.clientHeight));
+    const hfov = Math.atan(Math.tan(vfov) * aspect);
+    const elev = Math.asin(Math.min(1, Math.max(0.2, dir.y)));
+    const halfV = radius * Math.sin(elev) + b.maxY * Math.cos(elev) * 0.6;
+    const dist = Math.max(halfV / Math.tan(vfov), radius / Math.tan(hfov)) * 1.08 + radius * Math.cos(elev) * 0.15;
     const to = center.clone().addScaledVector(dir, dist);
     if (!animate) {
       this.controls.target.copy(center);

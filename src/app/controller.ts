@@ -144,7 +144,7 @@ export class Controller {
     if (!sel || !d) return;
     if (sel.kind === "file") {
       const b = this.city.boundsOfFiles([sel.id]);
-      if (b) this.city.flyTo(b, true, 16);
+      if (b) this.city.flyTo(b, true, 26);
     } else if (sel.kind === "dir") {
       const b = this.city.boundsOfDir(sel.path);
       if (b) this.city.flyTo(b);
@@ -195,7 +195,7 @@ export class Controller {
       const from = layout.platformByDir.get(ga);
       const to = layout.platformByDir.get(gb);
       if (!from || !to) continue;
-      arcs.push({ from: new Vector3(from.x, from.y + 0.4, from.z), to: new Vector3(to.x, to.y + 0.4, to.z), color: this.palette.accent, alpha: 0.15 + 0.85 * (Math.log(w + 1) / Math.log(max + 1)) });
+      arcs.push({ from: new Vector3(from.x, from.y + 0.4, from.z), to: new Vector3(to.x, to.y + 0.4, to.z), color: this.palette.accent, alpha: 0.35 + 0.65 * (Math.log(w + 1) / Math.log(max + 1)) });
     }
     return arcs;
   }

@@ -20,6 +20,8 @@ export function blockMaterial(opts: { edge: number; fill: number; glow: number }
       uFill: { value: opts.fill },
       uGlow: { value: opts.glow },
       uDim: { value: new Color("#151a22") },
+      /** 1 on light themes: darker edges instead of glowing ones. */
+      uLight: { value: 0 },
       ...fogUniforms(),
     },
     vertexShader: /* glsl */ `
@@ -56,6 +58,7 @@ export function blockMaterial(opts: { edge: number; fill: number; glow: number }
       uniform float uFill;
       uniform float uGlow;
       uniform vec3 uDim;
+      uniform float uLight;
       uniform vec3 uFogColor;
       uniform float uFogNear;
       uniform float uFogFar;
@@ -77,6 +80,10 @@ export function blockMaterial(opts: { edge: number; fill: number; glow: number }
         float light = 0.55 + 0.45 * max(dot(vNormal, normalize(vec3(0.45, 0.85, 0.3))), 0.0);
         float top = step(0.5, vNormal.y);
         vec3 col = vColor * (uFill * (0.35 + 0.65 * h) * light + top * 0.18) + vColor * edge * uGlow;
+        if (uLight > 0.5) {
+          vec3 body = vColor * (0.62 + 0.38 * h) * (0.7 + 0.3 * light) + top * 0.08;
+          col = mix(body, vColor * 0.42, edge);
+        }
         float pulse = vPulse * (0.5 + 0.5 * sin(uTime * 5.0));
         col += vColor * pulse * 0.9;
         if (vState > 0.5 && vState < 1.5) {

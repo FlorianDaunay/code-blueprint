@@ -109,12 +109,14 @@ export interface ResolveResult {
 
 class EdgeSet {
   private map = new Map<string, Edge>();
-  add(from: number, to: number, kind: Edge["kind"], weight = 1) {
+  add(from: number, to: number, kind: Edge["kind"], weight = 1, lazy = false) {
     if (from === to) return;
     const key = `${from}>${to}>${kind}`;
     const e = this.map.get(key);
-    if (e) e.weight += weight;
-    else this.map.set(key, { from, to, kind, weight });
+    if (e) {
+      e.weight += weight;
+      if (!lazy) delete e.lazy;
+    } else this.map.set(key, lazy ? { from, to, kind, weight, lazy } : { from, to, kind, weight });
   }
   has(from: number, to: number) {
     return this.map.has(`${from}>${to}>import`);
@@ -410,7 +412,7 @@ export function resolveImports(files: FileNode[], cfg: ResolverConfig): ResolveR
       case "python":
         for (const imp of f.source.imports) {
           const hits = resolvePy(f, imp);
-          for (const h of hits) edges.add(f.id, h.id, "import");
+          for (const h of hits) edges.add(f.id, h.id, "import", 1, imp.lazy);
           if (!hits.length) {
             const root = imp.spec.split(".")[0];
             if (imp.level || localPyRoots.has(root)) unresolved(f, ".".repeat(imp.level ?? 0) + imp.spec);

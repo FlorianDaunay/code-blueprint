@@ -38,19 +38,36 @@ function logicalLines(code: string): { text: string; line: number }[] {
 
 export function pythonImports(code: string): ImportInfo[] {
   const imports: ImportInfo[] = [];
+  // Imports under `if TYPE_CHECKING:` exist only for type hints: they are the idiom to *avoid* runtime cycles.
+  let typeOnlyIndent = -1;
+  // Indent of the innermost enclosing `def`, to spot function-local (lazy) imports.
+  const defs: number[] = [];
   for (const { text, line } of logicalLines(code)) {
     const t = text.trim();
+    if (!t) continue;
+    const indent = text.length - text.trimStart().length;
+    while (defs.length && indent <= defs[defs.length - 1]) defs.pop();
+    if (/^(async\s+)?def\s/.test(t)) defs.push(indent);
+    const lazy = defs.length > 0 && indent > defs[defs.length - 1];
+    if (typeOnlyIndent >= 0) {
+      if (indent > typeOnlyIndent) continue;
+      typeOnlyIndent = -1;
+    }
+    if (/^if\s+(not\s+)?([\w.]+\.)?TYPE_CHECKING\s*:/.test(t)) {
+      if (!/\bnot\b/.test(t)) typeOnlyIndent = indent;
+      continue;
+    }
     let m = /^from\s+(\.*)([\w.]*)\s+import\s+(.+)$/.exec(t);
     if (m) {
       const names = m[3].replace(/[()]/g, "").split(",").map((s) => s.trim().split(/\s+as\s+/)[0]).filter(Boolean);
-      imports.push({ spec: m[2], names, level: m[1].length, kind: "module", line });
+      imports.push({ spec: m[2], names, level: m[1].length, kind: "module", line, ...(lazy ? { lazy } : {}) });
       continue;
     }
     m = /^import\s+(.+)$/.exec(t);
     if (m) {
       for (const part of m[1].split(",")) {
         const [spec, alias] = part.trim().split(/\s+as\s+/);
-        if (spec) imports.push({ spec: spec.trim(), names: ["*"], alias: alias?.trim(), level: 0, kind: "module", line });
+        if (spec) imports.push({ spec: spec.trim(), names: ["*"], alias: alias?.trim(), level: 0, kind: "module", line, ...(lazy ? { lazy } : {}) });
       }
     }
   }
@@ -127,6 +144,14 @@ export function parsePython(masked: string, starts: number[]): ParsedFile {
   const classRe = /^([ \t]*)class\s+(\w+)\s*(\(|:)/;
   const defRe = /^([ \t]*)(async\s+)?def\s+(\w+)\s*\(/;
 
+  // Lines inside `if TYPE_CHECKING:` blocks: declarations there exist for type checkers only.
+  const typeOnly = new Set<number>();
+  lines.forEach((l, i) => {
+    if (!/^\s*if\s+([\w.]+\.)?TYPE_CHECKING\s*:/.test(l)) return;
+    const end = blockEnd(lines, i, indentOf(l));
+    for (let k = i + 1; k < end; k++) typeOnly.add(k);
+  });
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const cm = classRe.exec(line);
@@ -146,6 +171,7 @@ export function parsePython(masked: string, starts: number[]): ParsedFile {
       const meta = bases.find((b) => b.startsWith("metaclass"));
       const superNames = bases.filter((b) => !b.includes("=")).map(baseTypeName).filter((b) => b && b !== "object");
       const decorators = decoratorsAbove(lines, i, indent);
+      if (typeOnly.has(i)) decorators.push("type-only");
       if (meta) decorators.push("metaclass:" + baseTypeName(meta.split("=")[1] ?? ""));
       const fields: FieldInfo[] = [];
       const methods: MethodInfo[] = [];

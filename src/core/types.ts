@@ -188,7 +188,8 @@ export function buildTypeModel(files: FileNode[], importEdges: Edge[]): { model:
       const key = `${n.file}>${to}`;
       if (to === n.file || seen.has(key)) continue;
       seen.add(key);
-      inheritEdges.push({ from: n.file, to, kind: "inherit", weight: 1 });
+      // Classes declared for type checkers only (`if TYPE_CHECKING:`) never run: their links are lazy.
+      inheritEdges.push(n.info.decorators.includes("type-only") ? { from: n.file, to, kind: "inherit", weight: 1, lazy: true } : { from: n.file, to, kind: "inherit", weight: 1 });
     }
   }
   return { model: { nodes, resolve, isInterfaceLike, ancestors, depth }, inheritEdges };

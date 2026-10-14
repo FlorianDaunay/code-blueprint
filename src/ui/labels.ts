@@ -27,7 +27,7 @@ export class Labels {
       .map((e) => {
         const el = h("div.label.label-dir", { "data-level": e.level }, e.text);
         this.root.append(el);
-        return { el, pos: e.pos, width: e.width, minPx: 70 + e.level * 10, kind: "dir" as const };
+        return { el, pos: e.pos, width: e.width, minPx: e.level === 1 ? 34 : 60 + e.level * 10, kind: "dir" as const };
       });
   }
 

@@ -65,14 +65,19 @@ const ENTRY = /^(index|main|app|server|cli|__init__|__main__|setup|manage|confte
 export function runRules(ctx: AnalysisContext): Issue[] {
   const { files, edges, dirs, adj, deg, types } = ctx;
   const issues: Issue[] = [];
-  const name = (id: number) => files[id].name;
+  // Generic module names (`__init__.py`, `index.ts`) read better with their folder.
+  const name = (id: number) => (/^(__init__\.py|index\.\w+|mod\.rs|main\.go)$/.test(files[id].name) && files[id].dir ? `${files[id].dir.split("/").pop()}/${files[id].name}` : files[id].name);
 
   // Circular dependencies (file level).
-  for (const comp of stronglyConnected(adj)) {
+  // Go files of one package see each other implicitly and Go forbids package cycles: same-package links are not cycles.
+  // Deferred (function-local) imports are the standard way to break runtime cycles: they don't count.
+  const eager = adjacency(files.length, edges.filter((e) => !e.lazy));
+  const cycleAdj = eager.map((targets, from) => (files[from].lang === "go" ? targets.filter((t) => files[t].dir !== files[from].dir) : targets));
+  for (const comp of stronglyConnected(cycleAdj)) {
     const within = new Set(comp);
-    const cycle = shortestCycle(adj, comp[0], within);
+    const cycle = shortestCycle(cycleAdj, comp[0], within);
     const compEdges: [number, number][] = [];
-    for (const v of comp) for (const w of adj[v]) if (within.has(w)) compEdges.push([v, w]);
+    for (const v of comp) for (const w of cycleAdj[v]) if (within.has(w)) compEdges.push([v, w]);
     issues.push({
       id: `cycle:${comp[0]}`, rule: "cycle", severity: comp.length >= 3 ? "error" : "warning",
       files: comp, dirs: [], edges: compEdges,
@@ -87,6 +92,7 @@ export function runRules(ctx: AnalysisContext): Issue[] {
   const dirEdges: { from: number; to: number; kind: "import"; weight: number }[] = [];
   const dirEdgeFiles = new Map<string, [number, number][]>();
   for (const e of edges) {
+    if (e.lazy) continue;
     const a = dirOf(e.from);
     const b = dirOf(e.to);
     if (a === undefined || b === undefined || a === b) continue;

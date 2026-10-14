@@ -169,7 +169,8 @@ export function extract(source: string, path: string, lang: Lang): SourceInfo {
       parsed = parseBraceFile(masked, lang, starts, ns);
       break;
     case "python":
-      imports = pythonImports(code);
+      // Masked text: docstrings often contain example `import` lines.
+      imports = pythonImports(masked);
       parsed = parsePython(masked, starts);
       break;
     case "go":

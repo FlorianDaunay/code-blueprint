@@ -183,6 +183,7 @@ function showLanding() {
 }
 
 function goHome() {
+  loadedRoute = "";
   cancelAnalysis();
   loader.hide();
   history.pushState(null, "", location.pathname + location.search);
@@ -204,8 +205,52 @@ function navigate(input: string) {
   load(route);
 }
 
+// ---------------------------------------------------------------- Deep links: #/owner/repo?f=<file>&l=<lens>
+let loadedRoute = "";
+
+function selectionQuery(st: AppState): string {
+  const a = st.analysis;
+  const q = new URLSearchParams();
+  const sel = st.selection;
+  if (a && sel?.kind === "file") q.set("f", a.files[sel.id].path);
+  else if (sel?.kind === "dir") q.set("d", sel.path);
+  else if (sel?.kind === "issue") q.set("i", sel.id);
+  else if (sel?.kind === "pattern") q.set("p", sel.id);
+  if (st.lens !== "structure") q.set("l", st.lens);
+  const text = q.toString();
+  return text ? "?" + text : "";
+}
+
+function applyQuery(query: string) {
+  const s = store.state;
+  const a = s.analysis;
+  const d = s.derived;
+  if (!a || !d) return;
+  const q = new URLSearchParams(query);
+  const lens = LENSES.find((l) => l.id === q.get("l"))?.id ?? s.lens;
+  let selection: Selection = null;
+  const f = q.get("f");
+  const dir = q.get("d");
+  const i = q.get("i");
+  const p = q.get("p");
+  if (f) {
+    const file = a.files.find((x) => x.path === f);
+    if (file) selection = { kind: "file", id: file.id };
+  } else if (dir !== null && d.dirSet.has(dir)) selection = { kind: "dir", path: dir };
+  else if (i && d.issueById.has(i)) selection = { kind: "issue", id: i };
+  else if (p && d.patternById.has(p)) selection = { kind: "pattern", id: p };
+  store.set({ lens, selection, panel: selection ? "inspector" : s.panel });
+}
+
+store.subscribe((s, prev) => {
+  if (!s.analysis || !loadedRoute) return;
+  if (s.selection === prev.selection && s.lens === prev.lens && s.analysis === prev.analysis) return;
+  const hash = `#/${loadedRoute}${selectionQuery(s)}`;
+  if (location.hash !== hash) history.replaceState(null, "", hash);
+});
+
 let loadToken = 0;
-async function load(input: string, force = false) {
+async function load(input: string, force = false, query = "") {
   const token = ++loadToken;
   clear(errorSlot);
   clear(landingSlot);
@@ -219,8 +264,10 @@ async function load(input: string, force = false) {
     const derived = derive(analysis);
     city.controls.autoRotate = false;
     search.setAnalysis(analysis, (kind, key) => select(kind === "file" ? { kind: "file", id: key as number } : { kind: "dir", path: key as string }));
+    loadedRoute = input;
     store.set({ analysis, layout, derived, selection: null, hover: null, panel: "none" });
     loader.hide();
+    if (query) setTimeout(() => applyQuery(query), 300);
     document.title = `${analysis.repo.owner}/${analysis.repo.repo} · code·blueprint`;
   } catch (error) {
     if (token !== loadToken) return;
@@ -236,8 +283,10 @@ async function load(input: string, force = false) {
 }
 
 function fromHash() {
-  const route = decodeURIComponent(location.hash.replace(/^#\/?/, ""));
-  if (route && parseRepoInput(route)) load(route);
+  const [path, query = ""] = location.hash.replace(/^#\/?/, "").split("?");
+  const route = decodeURIComponent(path);
+  if (route && route === loadedRoute && store.state.analysis) applyQuery(query);
+  else if (route && parseRepoInput(route)) load(route, false, query);
   else goHome();
 }
 
@@ -245,4 +294,4 @@ window.addEventListener("popstate", fromHash);
 fromHash();
 
 // Debug/automation handle (used by tests and the console).
-(window as unknown as { codeBlueprint: unknown }).codeBlueprint = { store, city, LANG_LABEL };
+(window as unknown as { codeBlueprint: unknown }).codeBlueprint = { store, city, themeStore, LANG_LABEL };
